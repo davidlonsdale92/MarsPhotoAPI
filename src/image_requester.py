@@ -81,7 +81,7 @@ class ImageRequester:
                     print(f"\033[1;31m\nError connecting to {img_url}: {e}\033[0m")
 
             self.title_screen.draw_banner()
-            print("Download complete.")
+            print("Download complete. \n")
 
         else:
             print(f"\033[1;31m\nRequest failed: {response.status_code}\033[0m")
@@ -143,7 +143,7 @@ class ImageRequester:
                     print(f"\033[1;31m\nError connecting to {img_url}: {e}\033[0m")
 
             self.title_screen.draw_banner()
-            print("Download complete.")
+            print("Download complete. \n")
 
         else:
             print(f"\033[1;31m\nRequest failed: {response.status_code}\033[0m")

@@ -48,70 +48,90 @@ class Controller:
         ]
         return inquirer.prompt(questions, theme=self.theme)["action"]
 
-    def run(self):
-        """Main method to run the application."""
+    def select_rover(self):
         rover_choices = list(self.rover_options.keys()) + ["Exit"]
-        selected_rover = self.display_menu("\033[1;31mSelect rover", rover_choices)
+        return self.display_menu("\033[1;31mSelect rover", rover_choices)
 
-        if selected_rover == "Exit":
-            sys.exit(0)
+    def select_camera(self, selected_rover):
+        camera_choices = [
+            f"{cam[0]} - {cam[1]}" for cam in self.rover_options[selected_rover]
+        ] + ["Back"]
+        return self.display_menu("\033[1;31mSelect camera", camera_choices)
 
-        camera_choices = self.rover_options[selected_rover]
-        formatted_camera_choices = [f"{cam[0]} - {cam[1]}" for cam in camera_choices]
-        selected_camera, selected_camera_key = self.display_menu(
-            "\033[1;31mSelect camera", formatted_camera_choices
-        ).split(" - ", 1)
-
-        date_option = self.display_menu(
-            "\033[1;31m\nSelect a date option", ["Sol", "Earth Date"]
+    def select_date(self):
+        return self.display_menu(
+            "\033[1;31mSelect a date option", ["Sol", "Earth Date", "Back"]
         )
 
-        if date_option == "Sol":
-            while True:
-                self.title_screen.draw_banner()
-                sol_value = inquirer.prompt(
-                    [inquirer.Text("sol", message="Enter Sol value:")],
-                    theme=self.theme,
-                )["sol"]
-                if sol_value.isdigit():
-                    self.request_attributes(
-                        selected_rover, selected_camera_key, int(sol_value)
-                    )
+    def run(self):
+        current_step = "select_rover"
+        while True:
+            if current_step == "select_rover":
+                selected_rover = self.select_rover()
+                if selected_rover == "Exit":
+                    sys.exit(0)
+                current_step = "select_camera"
 
-                    next_action = self.post_download_menu()
+            if current_step == "select_camera":
+                selected_camera = self.select_camera(selected_rover)
+                if selected_camera == "Back":
+                    current_step = "select_rover"
+                    continue
+                selected_camera_key = selected_camera.split(" - ", 1)[0]
+                current_step = "select_date"
 
-                    if next_action == "Return to Main Menu":
-                        self.run()
-                    elif next_action == "Exit":
-                        sys.exit(0)
+            if current_step == "select_date":
+                date_option = self.select_date()
+                if date_option == "Back":
+                    current_step = "select_camera"
+                    continue
 
-                else:
-                    print(
-                        "\033[1;31mInvalid input. Please enter a valid integer.\033[0m"
-                    )
-        else:
-            while True:
-                self.title_screen.draw_banner()
-                date_input = inquirer.prompt(
-                    [inquirer.Text("date", message="Enter date (YYYY-MM-DD):")],
-                    theme=self.theme,
-                )["date"]
-                try:
-                    date_value = datetime.datetime.strptime(
-                        date_input, "%Y-%m-%d"
-                    ).date()
-                    self.request_attributes(
-                        selected_rover, selected_camera_key, date_value
-                    )
+            if date_option == "Sol":
+                while True:
+                    self.title_screen.draw_banner()
+                    sol_value = inquirer.prompt(
+                        [inquirer.Text("sol", message="Enter Sol value:")],
+                        theme=self.theme,
+                    )["sol"]
+                    if sol_value.isdigit():
+                        self.request_attributes(
+                            selected_rover, selected_camera_key, int(sol_value)
+                        )
 
-                    next_action = self.post_download_menu()
+                        next_action = self.post_download_menu()
 
-                    if next_action == "Return to Main Menu":
-                        self.run()
-                    elif next_action == "Exit":
-                        sys.exit(0)
+                        if next_action == "Return to Main Menu":
+                            self.run()
+                        elif next_action == "Exit":
+                            sys.exit(0)
 
-                except ValueError:
-                    print(
-                        "\033[1;31m\nInvalid input. Please enter a valid date (YYYY-MM-DD).\033[0m"
-                    )
+                    else:
+                        print(
+                            "\033[1;31mInvalid input. Please enter a valid integer.\033[0m"
+                        )
+            else:
+                while True:
+                    self.title_screen.draw_banner()
+                    date_input = inquirer.prompt(
+                        [inquirer.Text("date", message="Enter date (YYYY-MM-DD):")],
+                        theme=self.theme,
+                    )["date"]
+                    try:
+                        date_value = datetime.datetime.strptime(
+                            date_input, "%Y-%m-%d"
+                        ).date()
+                        self.request_attributes(
+                            selected_rover, selected_camera_key, date_value
+                        )
+
+                        next_action = self.post_download_menu()
+
+                        if next_action == "Return to Main Menu":
+                            self.run()
+                        elif next_action == "Exit":
+                            sys.exit(0)
+
+                    except ValueError:
+                        print(
+                            "\033[1;31m\nInvalid input. Please enter a valid date (YYYY-MM-DD).\033[0m"
+                        )
