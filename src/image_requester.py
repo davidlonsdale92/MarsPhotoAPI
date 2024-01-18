@@ -1,9 +1,7 @@
 import os
-import sys
-from pprint import pprint
 
-import inquirer
 import requests
+from tqdm import tqdm
 
 from src.util.title_screen import TitleScreen
 
@@ -11,19 +9,54 @@ from src.util.title_screen import TitleScreen
 class ImageRequester:
     def __init__(self, selected_rover, selected_camera, sol=0, earth_date=""):
         self.api_key = os.getenv("NASA_KEY")
-        self.rover = selected_rover
+        self.rover = selected_rover.lower()
         self.camera = selected_camera
         self.sol = sol
         self.earth_date = earth_date
-        self.api_url = f"https://api.nasa.gov/mars-photos/api/v1/rovers/{self.rover.lower()}/photos"
+        self.api_url = (
+            f"https://api.nasa.gov/mars-photos/api/v1/rovers/{self.rover}/photos"
+        )
         self.title_screen = TitleScreen()
 
     def check_directory(self, directory_path):
-        if not os.path.exists(directory_path):
-            os.makedirs(directory_path)
-            print(f"Directory '{directory_path}' created.")
+        os.makedirs(directory_path, exist_ok=True)
+        print(f"Directory checked: '{directory_path}'")
+
+    def download_image(self, photo, directory_path, pbar):
+        img_url = photo["img_src"]
+        img_filename = os.path.join(directory_path, f"{photo['id']}.jpg")
+
+        try:
+            response = requests.get(img_url, stream=True, timeout=10)
+            if response.status_code == 200:
+                with open(img_filename, "wb") as img_file:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        img_file.write(chunk)
+            else:
+                tqdm.write(
+                    f"Failed to download {img_url}, status code: {response.status_code}"
+                )  # Using tqdm.write
+        except requests.exceptions.RequestException as e:
+            tqdm.write(f"Error connecting to {img_url}: {e}")  # Using tqdm.write
+
+    def request_images(self, params):
+        directory_path = f"data/{self.rover}_photos/{self.camera}/{self.sol if self.sol else self.earth_date}"
+        self.check_directory(directory_path)
+
+        print(f"Requesting images from {self.api_url}")
+        response = requests.get(self.api_url, params=params)
+
+        if response.status_code == 200:
+            photos = response.json().get("photos", [])
+            with tqdm(total=len(photos), desc="Downloading images", unit="img") as pbar:
+                for photo in photos:
+                    self.download_image(photo, directory_path, pbar)
+                    pbar.update(1)
+            print("Download complete.")
         else:
-            print(f"Directory '{directory_path}' already exists.")
+            print(f"Request failed: {response.status_code}")
+
+        self.title_screen.draw_banner()
 
     def request_by_date(self):
         params = {
@@ -31,119 +64,8 @@ class ImageRequester:
             "camera": self.camera,
             "earth_date": self.earth_date,
         }
-
-        directory_path = f"data/{self.rover}_photos/{params['camera']}/earth_date/{params['earth_date']}"
-        self.check_directory(directory_path)
-
-        print(f"{self.api_url}, {params}")
-
-        # Make a GET request to the API
-        response = requests.get(self.api_url, params=params)
-        if response.status_code == 200:
-            print("Downloading images...")
-        else:
-            print(response)
-
-        # Check if the request was successful (status code 200)
-        if response.status_code == 200:
-            data = response.json()
-
-            # Extract and process the photos
-            photos = data["photos"]
-
-            for photo in photos:
-                photo_id = photo["id"]
-                earth_date = photo["earth_date"]
-                camera = photo["camera"]["name"]
-                img_url = photo["img_src"]
-                img_filename = os.path.join(
-                    f"data/{self.rover}_photos/{params['camera']}/earth_date/{params['earth_date']}",
-                    f"{params['camera']}_{params['earth_date']}_{photo['id']}.jpg",
-                )
-                earth_date = photo["earth_date"]
-
-                try:
-                    response = requests.get(img_url, timeout=10)
-                    if response.status_code == 200:
-                        print(f"\033[1;33m\nPhoto ID: {photo_id}\033[0m")
-                        print(f"Earth Date: {earth_date}")
-                        print(f"Camera: {camera}")
-                        print(f"Image Source: {img_url}")
-                        print("-" * 30)
-                        with open(img_filename, "wb") as img_file:
-                            img_file.write(response.content)
-                    else:
-                        print(
-                            f"\033[1;31m\nError downloading image {img_url}, \
-                            status code: {response.status_code}\033[0m"
-                        )
-                except requests.exceptions.RequestException as e:
-                    print(f"\033[1;31m\nError connecting to {img_url}: {e}\033[0m")
-
-            self.title_screen.draw_banner()
-            print("Download complete. \n")
-
-        else:
-            print(f"\033[1;31m\nRequest failed: {response.status_code}\033[0m")
+        self.request_images(params)
 
     def request_by_sol(self):
         params = {"api_key": self.api_key, "camera": self.camera, "sol": self.sol}
-
-        directory_path = (
-            f"data/{self.rover}_photos/{params['camera']}/sol/{params['sol']}"
-        )
-        self.check_directory(directory_path)
-
-        print(f"{self.api_url}, {params}")
-
-        # Make a GET request to the API
-        response = requests.get(self.api_url, params=params)
-
-        if response.status_code == 200:
-            print("Downloading images...")
-        else:
-            print(response)
-
-        # Check if the request was successful (status code 200)
-        if response.status_code == 200:
-            # Parse the JSON response
-            data = response.json()
-
-            # Extract and process the photos
-            photos = data["photos"]
-
-            for photo in photos:
-                photo_id = photo["id"]
-                sol = photo["sol"]
-                camera = photo["camera"]["name"]
-                img_url = photo["img_src"]
-                img_filename = os.path.join(
-                    f"data/{self.rover}_photos/{params['camera']}/sol/{params['sol']}",
-                    f"{params['camera']}_{params['sol']}_{photo['id']}.jpg",
-                )
-                earth_date = photo["earth_date"]
-
-                try:
-                    response = requests.get(img_url, timeout=10)
-                    if response.status_code == 200:
-                        print(f"\033[1;33m\nPhoto ID: {photo_id}\033[0m")
-                        print(f"SOL: {sol}")
-                        print(f"Camera: {camera}")
-                        print(f"Image Source: {img_url}")
-                        print(f"Earth Date: {earth_date}")
-                        print("-" * 30)
-                        with open(img_filename, "wb") as img_file:
-                            img_file.write(response.content)
-                    else:
-                        print(
-                            f"\033[1;31m\nError downloading image {img_url}, \
-                            status code: {response.status_code}\033[0m"
-                        )
-                except requests.exceptions.RequestException as e:
-                    print(f"\033[1;31m\nError connecting to {img_url}: {e}\033[0m")
-
-            self.title_screen.draw_banner()
-            print("Download complete. \n")
-
-        else:
-            print(f"\033[1;31m\nRequest failed: {response.status_code}\033[0m")
+        self.request_images(params)

@@ -12,8 +12,6 @@
 
 import os
 
-import inquirer
-
 from src.controller import Controller
 from src.util.title_screen import TitleScreen
 
